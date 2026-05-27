@@ -2,7 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
-import type { CliConfig, CliConfigInput } from './types/cli-config';
+import type { AddressResolverConfig, CliConfig, CliConfigInput } from './types/cli-config';
 import { pathExists, readJsonFile, writeTextFile } from './utils/fs';
 
 export const CONFIG_FILE_NAME = '.surge-vless-bridge.json';
@@ -16,6 +16,13 @@ const DEFAULT_HEADERS = {
   'user-agent':
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
 } as const;
+
+const DEFAULT_ADDRESS_RESOLVER: AddressResolverConfig = {
+  strategy: 'system',
+  dohEndpoint: 'https://1.1.1.1/dns-query',
+  dnsServers: ['1.1.1.1', '8.8.8.8'],
+  filterSurgeFakeIp: true,
+};
 
 const detectSingBoxBinary = async () => {
   const result = spawnSync('which', ['sing-box'], {
@@ -94,6 +101,7 @@ export const getDefaultConfig = async (_cwd: string): Promise<CliConfig> => {
     portStart: 2081,
     subscriptionOutputPath: join(stateDir, 'vless_nodes.txt'),
     requestHeaders: { ...DEFAULT_HEADERS },
+    addressResolver: { ...DEFAULT_ADDRESS_RESOLVER },
   };
 };
 
@@ -132,6 +140,10 @@ const mergeConfig = (base: CliConfig, input?: CliConfigInput): CliConfig => {
 
   const definedEntries = Object.entries(input).filter(([, value]) => value !== undefined);
   const sanitizedInput = Object.fromEntries(definedEntries) as CliConfigInput;
+  const addressResolverInput =
+    typeof sanitizedInput.addressResolver === 'string'
+      ? { strategy: sanitizedInput.addressResolver }
+      : sanitizedInput.addressResolver;
 
   return {
     ...base,
@@ -139,6 +151,10 @@ const mergeConfig = (base: CliConfig, input?: CliConfigInput): CliConfig => {
     requestHeaders: {
       ...base.requestHeaders,
       ...(sanitizedInput.requestHeaders ?? {}),
+    },
+    addressResolver: {
+      ...base.addressResolver,
+      ...(addressResolverInput ?? {}),
     },
   };
 };
