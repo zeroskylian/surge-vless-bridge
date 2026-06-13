@@ -78,7 +78,7 @@ const toOverrides = (options: Record<string, string | boolean>): CliConfigInput 
   const portStart = typeof options['port-start'] === 'string' ? Number(options['port-start']) : undefined;
 
   return {
-    subscriptionUrl: typeof options['subscription-url'] === 'string' ? options['subscription-url'] : undefined,
+    subscriptionUrl: typeof options['subscription-url'] === 'string' ? [options['subscription-url']] : undefined,
     surgeConfigPath: typeof options['surge-config'] === 'string' ? options['surge-config'] : undefined,
     singBoxBinary: typeof options['sing-box-bin'] === 'string' ? options['sing-box-bin'] : undefined,
     outputDir: typeof options['output-dir'] === 'string' ? options['output-dir'] : undefined,

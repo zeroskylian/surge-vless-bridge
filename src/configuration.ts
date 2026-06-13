@@ -90,7 +90,7 @@ export const getDefaultConfig = async (_cwd: string): Promise<CliConfig> => {
   const singBoxBinary = await detectSingBoxBinary();
 
   return {
-    subscriptionUrl: '',
+    subscriptionUrl: [],
     surgeConfigPath: await detectSurgeConfigPath(),
     singBoxBinary: singBoxBinary.path,
     outputDir: join(stateDir, 'nodes'),
@@ -133,6 +133,14 @@ const resolveDefaultConfigPath = (cwd: string) => {
   return resolve(cwd, CONFIG_FILE_NAME);
 };
 
+const normalizeSubscriptionUrl = (subscriptionUrl: CliConfigInput['subscriptionUrl']) => {
+  if (typeof subscriptionUrl === 'string') {
+    return subscriptionUrl.trim() ? [subscriptionUrl] : [];
+  }
+
+  return subscriptionUrl?.filter((url) => url.trim() !== '');
+};
+
 const mergeConfig = (base: CliConfig, input?: CliConfigInput): CliConfig => {
   if (!input) {
     return base;
@@ -148,6 +156,7 @@ const mergeConfig = (base: CliConfig, input?: CliConfigInput): CliConfig => {
   return {
     ...base,
     ...sanitizedInput,
+    subscriptionUrl: normalizeSubscriptionUrl(sanitizedInput.subscriptionUrl) ?? base.subscriptionUrl,
     requestHeaders: {
       ...base.requestHeaders,
       ...(sanitizedInput.requestHeaders ?? {}),
@@ -205,7 +214,7 @@ export const writeExampleConfig = async ({
   }
 
   const example: CliConfigInput = {
-    subscriptionUrl: '',
+    subscriptionUrl: ['https://your-provider.com/subscription'],
     surgeConfigPath: defaults.surgeConfigPath,
     policyGroupName: defaults.policyGroupName,
     portStart: defaults.portStart,

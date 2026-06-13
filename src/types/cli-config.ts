@@ -8,7 +8,7 @@ export type AddressResolverConfig = {
 };
 
 export type CliConfig = {
-  subscriptionUrl?: string;
+  subscriptionUrl: string[];
   surgeConfigPath: string;
   singBoxBinary: string;
   outputDir: string;
@@ -22,6 +22,7 @@ export type CliConfig = {
   addressResolver: AddressResolverConfig;
 };
 
-export type CliConfigInput = Partial<Omit<CliConfig, 'addressResolver'>> & {
+export type CliConfigInput = Partial<Omit<CliConfig, 'addressResolver' | 'subscriptionUrl'>> & {
+  subscriptionUrl?: string | string[];
   addressResolver?: AddressResolverStrategy | Partial<AddressResolverConfig>;
 };

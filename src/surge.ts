@@ -162,7 +162,7 @@ const buildExternalProxyLine = async ({
 };
 
 const ensureRequiredConfig = (config: CliConfig) => {
-  if (!config.subscriptionUrl) {
+  if (config.subscriptionUrl.length === 0) {
     throw new Error(
       'Missing subscriptionUrl. Run `surge-vless-bridge init` and fill the config, or pass --subscription-url.',
     );
@@ -315,11 +315,21 @@ const generateConfigsFromOutbounds = async ({
 export const syncSubscriptionToSurge = async (config: CliConfig) => {
   ensureRequiredConfig(config);
 
-  const vlessNodes = await getVlessSubscriptionNodes({
-    subscriptionUrl: config.subscriptionUrl!,
-    requestHeaders: config.requestHeaders,
-    subscriptionOutputPath: config.subscriptionOutputPath,
-  });
+  const vlessNodes = (
+    await Promise.all(
+      config.subscriptionUrl.map((subscriptionUrl) =>
+        getVlessSubscriptionNodes({
+          subscriptionUrl,
+          requestHeaders: config.requestHeaders,
+        }),
+      ),
+    )
+  ).flat();
+
+  if (config.subscriptionOutputPath) {
+    await writeTextFile(config.subscriptionOutputPath, `${vlessNodes.join('\n')}\n`);
+  }
+
   const outbounds = vlessNodes.map((node, index) => parseVlessNode(node, index));
   const generated = await generateConfigsFromOutbounds({ outbounds, config });
   const backupPath = await backupSurgeProfile(config);
@@ -438,7 +448,11 @@ const findLatestBackup = async (backupDir: string) => {
 
 export const runDoctor = async (config: CliConfig) => {
   const checks = [
-    ['subscriptionUrl', Boolean(config.subscriptionUrl), config.subscriptionUrl || 'missing'],
+    [
+      'subscriptionUrl',
+      config.subscriptionUrl.length > 0,
+      config.subscriptionUrl.length > 0 ? config.subscriptionUrl.join(', ') : 'missing',
+    ],
     [
       'surgeConfigPath',
       Boolean(config.surgeConfigPath) && (await pathExists(config.surgeConfigPath)),
