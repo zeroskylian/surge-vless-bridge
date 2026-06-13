@@ -1,7 +1,7 @@
 import { Resolver, lookup } from 'node:dns/promises';
 import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { isIP } from 'node:net';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
 import { getVlessSubscriptionNodes } from './parse';
 import type { AddressResolverConfig, CliConfig } from './types/cli-config';
@@ -113,6 +113,15 @@ const sanitizePolicyName = (tag: string, index: number) => {
     .replace(/\s+/g, ' ')
     .trim();
   return sanitized || `node${index + 1}`;
+};
+
+const sanitizeFileNamePart = (name: string) => {
+  const sanitized = name
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return sanitized || 'subscription';
 };
 
 const resolveAddresses = async (server: string, resolverConfig: AddressResolverConfig) => {
@@ -315,20 +324,32 @@ const generateConfigsFromOutbounds = async ({
 export const syncSubscriptionToSurge = async (config: CliConfig) => {
   ensureRequiredConfig(config);
 
-  const vlessNodes = (
-    await Promise.all(
-      config.subscriptionUrl.map((subscriptionUrl) =>
-        getVlessSubscriptionNodes({
-          subscriptionUrl,
-          requestHeaders: config.requestHeaders,
-        }),
-      ),
-    )
-  ).flat();
+  const subscriptionNames = new Set<string>();
+  const subscriptionResults = await Promise.all(
+    config.subscriptionUrl.map(async (subscription) => {
+      const fileNamePart = sanitizeFileNamePart(subscription.name);
+      if (subscriptionNames.has(fileNamePart)) {
+        throw new Error(`Duplicate subscription name after sanitizing: ${subscription.name}`);
+      }
+      subscriptionNames.add(fileNamePart);
 
-  if (config.subscriptionOutputPath) {
-    await writeTextFile(config.subscriptionOutputPath, `${vlessNodes.join('\n')}\n`);
-  }
+      const vlessNodes = await getVlessSubscriptionNodes({
+        subscriptionUrl: subscription.url,
+        requestHeaders: config.requestHeaders,
+      });
+
+      if (config.subscriptionOutputPath) {
+        await writeTextFile(
+          join(dirname(config.subscriptionOutputPath), `${fileNamePart}_node.txt`),
+          `${vlessNodes.join('\n')}\n`,
+        );
+      }
+
+      return vlessNodes;
+    }),
+  );
+
+  const vlessNodes = subscriptionResults.flat();
 
   const outbounds = vlessNodes.map((node, index) => parseVlessNode(node, index));
   const generated = await generateConfigsFromOutbounds({ outbounds, config });
@@ -451,7 +472,9 @@ export const runDoctor = async (config: CliConfig) => {
     [
       'subscriptionUrl',
       config.subscriptionUrl.length > 0,
-      config.subscriptionUrl.length > 0 ? config.subscriptionUrl.join(', ') : 'missing',
+      config.subscriptionUrl.length > 0
+        ? config.subscriptionUrl.map((subscription) => `${subscription.name}: ${subscription.url}`).join(', ')
+        : 'missing',
     ],
     [
       'surgeConfigPath',

@@ -2,7 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
-import type { AddressResolverConfig, CliConfig, CliConfigInput } from './types/cli-config';
+import type { AddressResolverConfig, CliConfig, CliConfigInput, SubscriptionConfig } from './types/cli-config';
 import { pathExists, readJsonFile, writeTextFile } from './utils/fs';
 
 export const CONFIG_FILE_NAME = '.surge-vless-bridge.json';
@@ -133,12 +133,39 @@ const resolveDefaultConfigPath = (cwd: string) => {
   return resolve(cwd, CONFIG_FILE_NAME);
 };
 
-const normalizeSubscriptionUrl = (subscriptionUrl: CliConfigInput['subscriptionUrl']) => {
-  if (typeof subscriptionUrl === 'string') {
-    return subscriptionUrl.trim() ? [subscriptionUrl] : [];
+const isSubscriptionConfig = (value: unknown): value is SubscriptionConfig => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as SubscriptionConfig).url === 'string' &&
+    typeof (value as SubscriptionConfig).name === 'string'
+  );
+};
+
+const normalizeSubscriptionUrl = (
+  subscriptionUrl: CliConfigInput['subscriptionUrl'],
+): SubscriptionConfig[] | undefined => {
+  if (Array.isArray(subscriptionUrl)) {
+    return subscriptionUrl
+      .map((entry) => {
+        if (isSubscriptionConfig(entry)) {
+          const url = entry.url.trim();
+          const name = entry.name.trim();
+          return url && name ? { url, name } : undefined;
+        }
+
+        return undefined;
+      })
+      .filter((entry): entry is SubscriptionConfig => Boolean(entry));
   }
 
-  return subscriptionUrl?.filter((url) => url.trim() !== '');
+  if (isSubscriptionConfig(subscriptionUrl)) {
+    const url = subscriptionUrl.url.trim();
+    const name = subscriptionUrl.name.trim();
+    return url && name ? [{ url, name }] : [];
+  }
+
+  return undefined;
 };
 
 const mergeConfig = (base: CliConfig, input?: CliConfigInput): CliConfig => {
@@ -214,7 +241,7 @@ export const writeExampleConfig = async ({
   }
 
   const example: CliConfigInput = {
-    subscriptionUrl: ['https://your-provider.com/subscription'],
+    subscriptionUrl: [{ url: 'https://your-provider.com/subscription', name: 'provider' }],
     surgeConfigPath: defaults.surgeConfigPath,
     policyGroupName: defaults.policyGroupName,
     portStart: defaults.portStart,

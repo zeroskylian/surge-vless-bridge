@@ -7,8 +7,13 @@ export type AddressResolverConfig = {
   filterSurgeFakeIp: boolean;
 };
 
+export type SubscriptionConfig = {
+  url: string;
+  name: string;
+};
+
 export type CliConfig = {
-  subscriptionUrl: string[];
+  subscriptionUrl: SubscriptionConfig[];
   surgeConfigPath: string;
   singBoxBinary: string;
   outputDir: string;
@@ -23,6 +28,6 @@ export type CliConfig = {
 };
 
 export type CliConfigInput = Partial<Omit<CliConfig, 'addressResolver' | 'subscriptionUrl'>> & {
-  subscriptionUrl?: string | string[];
+  subscriptionUrl?: SubscriptionConfig | SubscriptionConfig[];
   addressResolver?: AddressResolverStrategy | Partial<AddressResolverConfig>;
 };

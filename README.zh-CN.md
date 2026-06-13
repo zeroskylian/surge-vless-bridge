@@ -41,12 +41,12 @@ open ~/.config/surge-vless-bridge/config.json
 
 ```json
 {
-  "subscriptionUrl": ["https://your-provider.com/subscription"],
+  "subscriptionUrl": [{ "url": "https://your-provider.com/subscription", "name": "provider" }],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/MyProfile.conf"
 }
 ```
 
-- **`subscriptionUrl`**：填入你的 VLESS 订阅地址列表。
+- **`subscriptionUrl`**：填入你的 VLESS 订阅地址列表。每项包含 `url` 和 `name`，节点会写入 `${name}_node.txt`。
 
 - **`surgeConfigPath`**：Surge 配置文件的绝对路径。获取方式：
   1. 点击 macOS **菜单栏**中的 Surge 图标
@@ -79,7 +79,7 @@ surge-vless-bridge doctor
 
 ```json
 {
-  "subscriptionUrl": ["https://example.com/subscription"],
+  "subscriptionUrl": [{ "url": "https://example.com/subscription", "name": "example" }],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",
   "policyGroupName": "VLESS",
   "portStart": 2081,
@@ -96,7 +96,7 @@ surge-vless-bridge doctor
 
 | 字段              | 说明                     |
 | ----------------- | ------------------------ |
-| `subscriptionUrl` | VLESS 订阅地址列表       |
+| `subscriptionUrl` | VLESS 订阅地址对象列表   |
 | `surgeConfigPath` | Surge 配置文件的绝对路径 |
 
 **选填**
