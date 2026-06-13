@@ -324,14 +324,14 @@ const generateConfigsFromOutbounds = async ({
 export const syncSubscriptionToSurge = async (config: CliConfig) => {
   ensureRequiredConfig(config);
 
-  const subscriptionNames = new Set<string>();
+  const subscriptionProviders = new Set<string>();
   const subscriptionResults = await Promise.all(
     config.subscriptionUrl.map(async (subscription) => {
-      const fileNamePart = sanitizeFileNamePart(subscription.name);
-      if (subscriptionNames.has(fileNamePart)) {
-        throw new Error(`Duplicate subscription name after sanitizing: ${subscription.name}`);
+      const fileNamePart = sanitizeFileNamePart(subscription.provider);
+      if (subscriptionProviders.has(fileNamePart)) {
+        throw new Error(`Duplicate subscription provider after sanitizing: ${subscription.provider}`);
       }
-      subscriptionNames.add(fileNamePart);
+      subscriptionProviders.add(fileNamePart);
 
       const vlessNodes = await getVlessSubscriptionNodes({
         subscriptionUrl: subscription.url,
@@ -346,18 +346,18 @@ export const syncSubscriptionToSurge = async (config: CliConfig) => {
       }
 
       return {
-        subscriptionName: subscription.name,
+        nodePrefix: subscription.nodePrefix,
         vlessNodes,
       };
     }),
   );
 
-  const outbounds = subscriptionResults.flatMap(({ subscriptionName, vlessNodes }) =>
+  const outbounds = subscriptionResults.flatMap(({ nodePrefix, vlessNodes }) =>
     vlessNodes.map((node, index) => {
       const outbound = parseVlessNode(node, index);
       return {
         ...outbound,
-        tag: `[${subscriptionName}]${outbound.tag}`,
+        tag: nodePrefix ? `${nodePrefix}${outbound.tag}` : outbound.tag,
       };
     }),
   );
@@ -482,7 +482,7 @@ export const runDoctor = async (config: CliConfig) => {
       'subscriptionUrl',
       config.subscriptionUrl.length > 0,
       config.subscriptionUrl.length > 0
-        ? config.subscriptionUrl.map((subscription) => `${subscription.name}: ${subscription.url}`).join(', ')
+        ? config.subscriptionUrl.map((subscription) => `${subscription.provider}: ${subscription.url}`).join(', ')
         : 'missing',
     ],
     [

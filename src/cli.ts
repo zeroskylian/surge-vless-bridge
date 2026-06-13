@@ -80,7 +80,7 @@ const toOverrides = (options: Record<string, string | boolean>): CliConfigInput 
   return {
     subscriptionUrl:
       typeof options['subscription-url'] === 'string'
-        ? { url: options['subscription-url'], name: 'subscription' }
+        ? { url: options['subscription-url'], provider: 'subscription' }
         : undefined,
     surgeConfigPath: typeof options['surge-config'] === 'string' ? options['surge-config'] : undefined,
     singBoxBinary: typeof options['sing-box-bin'] === 'string' ? options['sing-box-bin'] : undefined,

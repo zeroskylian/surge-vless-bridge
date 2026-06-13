@@ -41,12 +41,12 @@ Fill in at minimum:
 
 ```json
 {
-  "subscriptionUrl": [{ "url": "https://your-provider.com/subscription", "name": "provider" }],
+  "subscriptionUrl": [{ "url": "https://your-provider.com/subscription", "provider": "provider" }],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/MyProfile.conf"
 }
 ```
 
-- **`subscriptionUrl`**: Your VLESS subscription URL list. Each item needs a `url` and a `name`; nodes are written to `${name}_node.txt`.
+- **`subscriptionUrl`**: Your VLESS subscription URL list. Each item needs a `url` and `provider`; nodes are written to `${provider}_node.txt`. Optional `nodePrefix` is prepended directly to generated node names.
 
 - **`surgeConfigPath`**: Absolute path to your Surge profile. To find it:
   1. Click the Surge icon in the **macOS menu bar**
@@ -79,7 +79,7 @@ Created by `init`. Default path: `~/.config/surge-vless-bridge/config.json`.
 
 ```json
 {
-  "subscriptionUrl": [{ "url": "https://example.com/subscription", "name": "example" }],
+  "subscriptionUrl": [{ "url": "https://example.com/subscription", "provider": "example", "nodePrefix": "example" }],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",
   "policyGroupName": "VLESS",
   "portStart": 2081,

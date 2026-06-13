@@ -138,7 +138,9 @@ const isSubscriptionConfig = (value: unknown): value is SubscriptionConfig => {
     typeof value === 'object' &&
     value !== null &&
     typeof (value as SubscriptionConfig).url === 'string' &&
-    typeof (value as SubscriptionConfig).name === 'string'
+    typeof (value as SubscriptionConfig).provider === 'string' &&
+    (typeof (value as SubscriptionConfig).nodePrefix === 'string' ||
+      (value as SubscriptionConfig).nodePrefix === undefined)
   );
 };
 
@@ -150,8 +152,9 @@ const normalizeSubscriptionUrl = (
       .map((entry) => {
         if (isSubscriptionConfig(entry)) {
           const url = entry.url.trim();
-          const name = entry.name.trim();
-          return url && name ? { url, name } : undefined;
+          const provider = entry.provider.trim();
+          const nodePrefix = entry.nodePrefix?.trim();
+          return url && provider ? { url, provider, ...(nodePrefix ? { nodePrefix } : {}) } : undefined;
         }
 
         return undefined;
@@ -161,8 +164,9 @@ const normalizeSubscriptionUrl = (
 
   if (isSubscriptionConfig(subscriptionUrl)) {
     const url = subscriptionUrl.url.trim();
-    const name = subscriptionUrl.name.trim();
-    return url && name ? [{ url, name }] : [];
+    const provider = subscriptionUrl.provider.trim();
+    const nodePrefix = subscriptionUrl.nodePrefix?.trim();
+    return url && provider ? [{ url, provider, ...(nodePrefix ? { nodePrefix } : {}) }] : [];
   }
 
   return undefined;
@@ -241,7 +245,7 @@ export const writeExampleConfig = async ({
   }
 
   const example: CliConfigInput = {
-    subscriptionUrl: [{ url: 'https://your-provider.com/subscription', name: 'provider' }],
+    subscriptionUrl: [{ url: 'https://your-provider.com/subscription', provider: 'provider' }],
     surgeConfigPath: defaults.surgeConfigPath,
     policyGroupName: defaults.policyGroupName,
     portStart: defaults.portStart,

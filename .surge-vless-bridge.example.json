@@ -2,7 +2,7 @@
   "subscriptionUrl": [
     {
       "url": "https://example.com/subscription",
-      "name": "example"
+      "provider": "example"
     }
   ],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",

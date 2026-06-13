@@ -9,7 +9,8 @@ export type AddressResolverConfig = {
 
 export type SubscriptionConfig = {
   url: string;
-  name: string;
+  provider: string;
+  nodePrefix?: string;
 };
 
 export type CliConfig = {
