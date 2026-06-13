@@ -82,7 +82,13 @@ surge-vless-bridge doctor
   "subscriptionUrl": "https://example.com/subscription",
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",
   "policyGroupName": "VLESS",
-  "portStart": 2081
+  "portStart": 2081,
+  "addressResolver": {
+    "strategy": "system",
+    "filterSurgeFakeIp": true,
+    "dohEndpoint": "https://1.1.1.1/dns-query",
+    "dnsServers": ["1.1.1.1", "8.8.8.8"]
+  }
 }
 ```
 
@@ -102,6 +108,18 @@ surge-vless-bridge doctor
 | `singBoxBinary`   | 自动检测（`which sing-box`）           | `sing-box` 可执行文件路径        |
 | `outputDir`       | `~/.config/surge-vless-bridge/nodes`   | 每个节点的 sing-box 配置保存目录 |
 | `backupDir`       | `~/.config/surge-vless-bridge/backups` | Surge 配置备份目录               |
+| `addressResolver` | 见下方                                 | 为 `addresses=` 解析代理服务器域名 |
+
+`addressResolver.strategy` 可选：
+
+| 策略     | 说明                                                                             |
+| -------- | -------------------------------------------------------------------------------- |
+| `system` | 使用 Node.js 系统 DNS 解析，这是默认值。                                          |
+| `dns`    | 使用 `addressResolver.dnsServers` 解析，例如 `["1.1.1.1", "8.8.8.8"]`。          |
+| `doh`    | 使用 `addressResolver.dohEndpoint` 解析，然后回退到 `addressResolver.dnsServers`。 |
+| `off`    | 不在生成的 Surge external proxy 条目中写入 `addresses=`。                         |
+
+`addressResolver.filterSurgeFakeIp` 默认为 `true`。它会在写入 `addresses=` 前过滤 `198.18.0.0/15` 地址，避免把 Surge fake-ip 结果固定到 external proxy 条目里。如果 Surge fake-ip DNS 影响了系统解析，可以设置 `"strategy": "doh"` 或 `"strategy": "dns"`。
 
 也可以通过命令行参数临时覆盖：
 

@@ -82,7 +82,13 @@ Created by `init`. Default path: `~/.config/surge-vless-bridge/config.json`.
   "subscriptionUrl": "https://example.com/subscription",
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",
   "policyGroupName": "VLESS",
-  "portStart": 2081
+  "portStart": 2081,
+  "addressResolver": {
+    "strategy": "system",
+    "filterSurgeFakeIp": true,
+    "dohEndpoint": "https://1.1.1.1/dns-query",
+    "dnsServers": ["1.1.1.1", "8.8.8.8"]
+  }
 }
 ```
 
@@ -102,6 +108,18 @@ Created by `init`. Default path: `~/.config/surge-vless-bridge/config.json`.
 | `singBoxBinary`   | auto-detected via `which sing-box`     | Path to the `sing-box` binary                          |
 | `outputDir`       | `~/.config/surge-vless-bridge/nodes`   | Where per-node sing-box configs are written            |
 | `backupDir`       | `~/.config/surge-vless-bridge/backups` | Where Surge profile backups are stored                 |
+| `addressResolver` | see below                              | How to resolve proxy server domains for `addresses=`   |
+
+`addressResolver.strategy` can be:
+
+| Strategy | Description                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------- |
+| `system` | Use Node.js system DNS resolution. This is the default.                                       |
+| `dns`    | Resolve with `addressResolver.dnsServers`, such as `["1.1.1.1", "8.8.8.8"]`.                 |
+| `doh`    | Resolve with `addressResolver.dohEndpoint`, then fall back to `addressResolver.dnsServers`.   |
+| `off`    | Do not write `addresses=` in generated Surge external proxy entries.                          |
+
+`addressResolver.filterSurgeFakeIp` defaults to `true`. It filters `198.18.0.0/15` addresses before writing `addresses=`, avoiding Surge fake-ip results being pinned into external proxy entries. If Surge's fake-ip DNS affects your system resolver, set `"strategy": "doh"` or `"strategy": "dns"`.
 
 You can also override fields at runtime:
 

@@ -1,16 +1,20 @@
-import { lookup } from 'node:dns/promises';
+import { Resolver, lookup } from 'node:dns/promises';
 import { mkdir, readFile, readdir } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import { basename, join, resolve } from 'node:path';
 
 import { getVlessSubscriptionNodes } from './parse';
-import type { CliConfig } from './types/cli-config';
+import type { AddressResolverConfig, CliConfig } from './types/cli-config';
 import type { SingBoxVlessOutbound } from './types/sing-box-vless-outbound';
 import { parseTemplate } from './utils/parse-template';
 import { pathExists, readJsonFile, readTextFile, writeBinaryFile, writeTextFile } from './utils/fs';
 import { parseVlessNode } from './utils/parse-vless-node';
 
 const POLICY_REGEX_FILTER = /^((?!Remain|Expired|官网|如需|套餐|去除|剩余|距离|Reset|重置|流量).)+$/;
+const DOH_RECORD_TYPES = {
+  A: 1,
+  AAAA: 28,
+} as const;
 
 type GeneratedNode = {
   nodeName: string;
@@ -28,6 +32,80 @@ type SingBoxConfig = {
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const isSurgeFakeIp = (address: string) => {
+  if (isIP(address) !== 4) {
+    return false;
+  }
+
+  const [first, second] = address.split('.').map((part) => Number(part));
+  return first === 198 && (second === 18 || second === 19);
+};
+
+const uniqueRealAddresses = (addresses: string[], resolverConfig: AddressResolverConfig) => [
+  ...new Set(
+    addresses.filter((address) => isIP(address) && (!resolverConfig.filterSurgeFakeIp || !isSurgeFakeIp(address))),
+  ),
+];
+
+const resolveWithSystem = async (server: string) => {
+  const records = await lookup(server, { all: true });
+  return records.map((record) => record.address);
+};
+
+const resolveWithDnsServers = async (server: string, dnsServers: string[]) => {
+  const resolver = new Resolver();
+  if (dnsServers.length > 0) {
+    resolver.setServers(dnsServers);
+  }
+
+  const settled = await Promise.allSettled([resolver.resolve4(server), resolver.resolve6(server)]);
+  return settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+};
+
+const queryDohAddresses = async (
+  server: string,
+  recordType: keyof typeof DOH_RECORD_TYPES,
+  dohEndpoint: string,
+) => {
+  const url = new URL(dohEndpoint);
+  url.searchParams.set('name', server);
+  url.searchParams.set('type', recordType);
+
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/dns-json',
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = (await response.json()) as {
+    Answer?: Array<{
+      type?: number;
+      data?: string;
+    }>;
+  };
+
+  if (!Array.isArray(payload.Answer)) {
+    return [];
+  }
+
+  const answerType = DOH_RECORD_TYPES[recordType];
+  return payload.Answer.filter((answer) => answer.type === answerType && typeof answer.data === 'string').map(
+    (answer) => answer.data as string,
+  );
+};
+
+const resolveWithDoh = async (server: string, dohEndpoint: string) => {
+  const settled = await Promise.allSettled([
+    queryDohAddresses(server, 'A', dohEndpoint),
+    queryDohAddresses(server, 'AAAA', dohEndpoint),
+  ]);
+  return settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+};
+
 const sanitizePolicyName = (tag: string, index: number) => {
   const candidate = POLICY_REGEX_FILTER.test(tag) ? tag : `node${index + 1}`;
   const sanitized = candidate
@@ -37,14 +115,33 @@ const sanitizePolicyName = (tag: string, index: number) => {
   return sanitized || `node${index + 1}`;
 };
 
-const resolveAddresses = async (server: string) => {
+const resolveAddresses = async (server: string, resolverConfig: AddressResolverConfig) => {
+  if (resolverConfig.strategy === 'off') {
+    return [];
+  }
+
   if (isIP(server)) {
-    return [server];
+    return uniqueRealAddresses([server], resolverConfig);
   }
 
   try {
-    const records = await lookup(server, { all: true });
-    return [...new Set(records.map((record) => record.address))];
+    if (resolverConfig.strategy === 'doh') {
+      const dohAddresses = uniqueRealAddresses(
+        await resolveWithDoh(server, resolverConfig.dohEndpoint),
+        resolverConfig,
+      );
+      if (dohAddresses.length > 0) {
+        return dohAddresses;
+      }
+
+      return uniqueRealAddresses(await resolveWithDnsServers(server, resolverConfig.dnsServers), resolverConfig);
+    }
+
+    if (resolverConfig.strategy === 'dns') {
+      return uniqueRealAddresses(await resolveWithDnsServers(server, resolverConfig.dnsServers), resolverConfig);
+    }
+
+    return uniqueRealAddresses(await resolveWithSystem(server), resolverConfig);
   } catch (error) {
     console.error(`Failed to resolve ${server}:`, error);
     return [];
@@ -57,8 +154,9 @@ const buildExternalProxyLine = async ({
   configPath,
   server,
   singBoxBinary,
-}: GeneratedNode & { singBoxBinary: string }) => {
-  const addresses = await resolveAddresses(server);
+  addressResolver,
+}: GeneratedNode & { singBoxBinary: string; addressResolver: AddressResolverConfig }) => {
+  const addresses = await resolveAddresses(server, addressResolver);
   const addressArg = addresses.length > 0 ? `, addresses=${addresses.join(',')}` : '';
   return `${nodeName} = external, exec=${singBoxBinary}, args=run, args=-c, args=${configPath}, local-port=${port}${addressArg}`;
 };
@@ -202,6 +300,7 @@ const generateConfigsFromOutbounds = async ({
       buildExternalProxyLine({
         ...entry,
         singBoxBinary: config.singBoxBinary,
+        addressResolver: config.addressResolver,
       }),
     ),
   );
@@ -292,6 +391,7 @@ export const rebuildSurgeFromLocalConfigs = async (config: CliConfig) => {
       buildExternalProxyLine({
         ...entry,
         singBoxBinary: config.singBoxBinary,
+        addressResolver: config.addressResolver,
       }),
     ),
   );
