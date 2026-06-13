@@ -345,13 +345,22 @@ export const syncSubscriptionToSurge = async (config: CliConfig) => {
         );
       }
 
-      return vlessNodes;
+      return {
+        subscriptionName: subscription.name,
+        vlessNodes,
+      };
     }),
   );
 
-  const vlessNodes = subscriptionResults.flat();
-
-  const outbounds = vlessNodes.map((node, index) => parseVlessNode(node, index));
+  const outbounds = subscriptionResults.flatMap(({ subscriptionName, vlessNodes }) =>
+    vlessNodes.map((node, index) => {
+      const outbound = parseVlessNode(node, index);
+      return {
+        ...outbound,
+        tag: `[${subscriptionName}]${outbound.tag}`,
+      };
+    }),
+  );
   const generated = await generateConfigsFromOutbounds({ outbounds, config });
   const backupPath = await backupSurgeProfile(config);
 
