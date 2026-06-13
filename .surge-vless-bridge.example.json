@@ -1,5 +1,10 @@
 {
-  "subscriptionUrl": [{ "url": "https://example.com/subscription", "name": "example" }],
+  "subscriptionUrl": [
+    {
+      "url": "https://example.com/subscription",
+      "name": "example"
+    }
+  ],
   "surgeConfigPath": "/Users/you/Library/Application Support/Surge/Profiles/Config.conf",
   "policyGroupName": "VLESS",
   "portStart": 2081,
